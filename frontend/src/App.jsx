@@ -1,11 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/common/Navbar';
-import HomePage from './pages/HomePage';
+import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import { AuthProvider } from './auth/AuthContext';
+import ProjectDetailPage from './pages/ProjectDetailPage';
 
 export default function App() {
   return (
@@ -18,7 +19,8 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<HomePage />} />
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,6 +1,6 @@
 import React from 'react';
 import StatusBadge from './StatusBadge';
-import { Layers, Kanban, CheckSquare } from 'lucide-react';
+import { Layers, Kanban } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 
@@ -23,7 +23,7 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <span className="font-bold text-lg text-white tracking-tight">TaskFlow</span>
               <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full">
-                Phase 3
+                Phase 4
               </span>
             </div>
             <p className="text-xs text-slate-400 font-medium">Collaborative Project Management</p>
@@ -32,12 +32,9 @@ export default function Navbar() {
 
         {/* Center Navigation Links (Preview for future phases) */}
         <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-slate-400">
-          <span className="flex items-center gap-1.5 px-3 py-1.5 text-white bg-slate-800/80 rounded-lg">
-            <Kanban className="w-4 h-4 text-indigo-400" /> System Overview
-          </span>
-          <span className="flex items-center gap-1.5 px-3 py-1.5 hover:text-slate-200 transition opacity-60 cursor-not-allowed">
-            <CheckSquare className="w-4 h-4" /> Projects (Phase 4)
-          </span>
+          {user && <Link to="/" className="flex items-center gap-1.5 px-3 py-1.5 text-white bg-slate-800/80 rounded-lg">
+            <Kanban className="w-4 h-4 text-indigo-400" /> Dashboard
+          </Link>}
           {user && <span className="px-3 py-1.5 text-slate-300">{user.name}</span>}
         </nav>
 

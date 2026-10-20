@@ -208,6 +208,30 @@ The frontend keeps the access token in `localStorage` and sends it through the A
 
 Copy `backend/.env.example` to `backend/.env`, then set a private `JWT_SECRET_KEY`. Install backend dependencies with `pip install -r backend/requirements.txt`; the frontend needs no added dependencies. Run the API and Vite frontend using the setup steps below. Authentication tests run with `pytest` from `backend`; their SQLite test database does not require a live PostgreSQL server. The separately existing live migration integration test skips unless a disposable PostgreSQL test database is available.
 
+## 🗂 Project Management (Phase 4)
+
+Authenticated users can create projects and access only projects where they are members. The creator receives the `owner` role. Owners control settings and membership and are the only role that can delete a project; admins can update project settings and manage member-level membership; all members can create and update tasks and comments; only owners/admins can delete tasks. Project owners cannot be removed. Membership invitations use an existing active account's email; no public user directory is exposed.
+
+Tasks and comments are scoped to project membership. Assignees must be members. Valid task statuses are `todo`, `in_progress`, and `done`; priorities are `low`, `medium`, `high`, and `urgent`. Server-side search and filters include text, status, priority, assignee, due-date range, sorting, and pagination. Activity entries are written in the same transaction as their successful operation. The authenticated dashboard reports only projects and tasks the current user can access.
+
+Main Phase 4 routes require a bearer token:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` / `POST` | `/api/v1/projects` | List accessible projects / create a project |
+| `GET` / `PATCH` / `DELETE` | `/api/v1/projects/{project_id}` | Read, update (owner/admin), or delete (owner) |
+| `GET` / `POST` | `/api/v1/projects/{project_id}/members` | List members / add registered user by email |
+| `DELETE` | `/api/v1/projects/{project_id}/members/{user_id}` | Remove a non-owner member |
+| `GET` / `POST` | `/api/v1/projects/{project_id}/tasks` | Filter/list tasks / create task |
+| `GET` / `PATCH` / `DELETE` | `/api/v1/projects/{project_id}/tasks/{task_id}` | Read, update, or delete task |
+| `GET` / `POST` | `/api/v1/projects/{project_id}/tasks/{task_id}/comments` | List or add task comments |
+| `PATCH` / `DELETE` | `/api/v1/projects/{project_id}/tasks/{task_id}/comments/{comment_id}` | Edit or remove authorized comment |
+| `GET` | `/api/v1/projects/{project_id}/activity` | View project activity |
+| `GET` | `/api/v1/projects/dashboard` | Access-scoped dashboard summaries |
+| `GET` | `/api/v1/projects/tasks/search` | Search across accessible projects |
+
+Task list/search query parameters include `q`, `project_id` (search), `status`, `priority`, `assignee_id`, `due_from`, `due_to`, `sort`, `order`, `limit`, and `offset` as applicable. The existing initial migration already defines the required schema, so Phase 4 adds no migration. For a fresh local database, run `alembic upgrade head` from `backend`; do not downgrade a database containing data you need. Run tests with `pytest` from `backend` and build the frontend with `npm run build` from `frontend`. Feature API tests use isolated SQLite; the live migration test requires disposable PostgreSQL.
+
 ## 📡 API Endpoints
 
 | Method | Path | Description | Query Parameters |
@@ -222,6 +246,10 @@ Copy `backend/.env.example` to `backend/.env`, then set a private `JWT_SECRET_KE
 | `POST` | `/api/v1/auth/login` | Obtain an access token | None |
 | `GET` | `/api/v1/auth/me` | Get authenticated user profile | Bearer token |
 | `POST` | `/api/v1/auth/logout` | Client-side sign-out confirmation | Bearer token |
+| `GET` / `POST` | `/api/v1/projects` | List accessible projects / create a project | Bearer token |
+| `GET` / `PATCH` / `DELETE` | `/api/v1/projects/{project_id}` | Read/update/delete an authorized project | Bearer token |
+| `GET` / `POST` | `/api/v1/projects/{project_id}/tasks` | List/filter or create project tasks | Bearer token |
+| `GET` | `/api/v1/projects/dashboard` | Access-scoped dashboard counts and task lists | Bearer token |
 
 ---
 
@@ -230,7 +258,7 @@ Copy `backend/.env.example` to `backend/.env`, then set a private `JWT_SECRET_KE
 - [x] **Phase 1: Project structure, React + Vite, FastAPI, PostgreSQL configuration, health endpoints, initial tests.**
 - [x] **Phase 2: Database models, SQLAlchemy configuration, Alembic migrations, and database integration tests.**
 - [x] **Phase 3: Registration, login, logout, authentication, protected routes, and security tests.**
-- [ ] **Phase 4: Project CRUD, memberships, invitations, and role-based authorization.**
+- [x] **Phase 4: Project CRUD, memberships, invitations, and role-based authorization.**
 - [ ] **Phase 5: Task CRUD, assignments, priorities, statuses, deadlines, search, and filtering.**
 - [ ] **Phase 6: Task comments, activity history, and collaboration.**
 - [ ] **Phase 7: Notifications and real-time WebSocket updates.**

@@ -15,3 +15,7 @@ class ActivityLogRead(BaseModel):
     entity_id: Optional[uuid.UUID] = None
     details: Optional[Dict[str, Any]] = None
     created_at: datetime
+
+
+class ActivityDetail(ActivityLogRead):
+    actor_name: Optional[str] = None
