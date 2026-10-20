@@ -189,7 +189,26 @@ npm run build
 
 ---
 
-## 📡 API Endpoints (Phase 1)
+## 🔐 Authentication (Phase 3)
+
+The API stores Argon2id password hashes and issues signed HS256 bearer access tokens. Set `JWT_SECRET_KEY` in `backend/.env`; use a unique random value of at least 32 characters for production. `JWT_ALGORITHM` is restricted to `HS256`, and `ACCESS_TOKEN_EXPIRE_MINUTES` controls token lifetime. Production startup fails if the JWT key is not explicitly configured securely. Do not commit actual environment files or production secrets.
+
+Authentication endpoints under `/api/v1/auth`:
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/auth/register` | Create an account |
+| `POST` | `/api/v1/auth/login` | Verify credentials and return a bearer access token |
+| `GET` | `/api/v1/auth/me` | Return the authenticated user's safe profile |
+| `POST` | `/api/v1/auth/logout` | Confirm client sign-out; requires a valid bearer token |
+
+The frontend keeps the access token in `localStorage` and sends it through the Axios `Authorization` header. This is simple for the current SPA but exposes bearer tokens to JavaScript executing through an XSS flaw; use a hardened Content Security Policy and consider migrating to `HttpOnly`, `Secure`, `SameSite` cookies for a stronger session boundary. Passwords are never stored in browser storage. Logout removes the token from this browser only; stateless JWTs remain usable until expiration and are not revoked server-side.
+
+### Auth environment and dependencies
+
+Copy `backend/.env.example` to `backend/.env`, then set a private `JWT_SECRET_KEY`. Install backend dependencies with `pip install -r backend/requirements.txt`; the frontend needs no added dependencies. Run the API and Vite frontend using the setup steps below. Authentication tests run with `pytest` from `backend`; their SQLite test database does not require a live PostgreSQL server. The separately existing live migration integration test skips unless a disposable PostgreSQL test database is available.
+
+## 📡 API Endpoints
 
 | Method | Path | Description | Query Parameters |
 |---|---|---|---|
@@ -199,14 +218,18 @@ npm run build
 | `GET` | `/api/v1/health` | Comprehensive system health & database probe | `strict` (boolean, default: false) |
 | `GET` | `/api/v1/docs` | OpenAPI / Swagger interactive documentation | None |
 | `GET` | `/api/v1/openapi.json` | Raw OpenAPI 3.1 specification | None |
+| `POST` | `/api/v1/auth/register` | Register a user | None |
+| `POST` | `/api/v1/auth/login` | Obtain an access token | None |
+| `GET` | `/api/v1/auth/me` | Get authenticated user profile | Bearer token |
+| `POST` | `/api/v1/auth/logout` | Client-side sign-out confirmation | Bearer token |
 
 ---
 
 ## 🗺 Development Roadmap
 
 - [x] **Phase 1: Project structure, React + Vite, FastAPI, PostgreSQL configuration, health endpoints, initial tests.**
-- [ ] **Phase 2: Database models, SQLAlchemy configuration, Alembic migrations, and database integration tests.**
-- [ ] **Phase 3: Registration, login, logout, authentication, protected routes, and security tests.**
+- [x] **Phase 2: Database models, SQLAlchemy configuration, Alembic migrations, and database integration tests.**
+- [x] **Phase 3: Registration, login, logout, authentication, protected routes, and security tests.**
 - [ ] **Phase 4: Project CRUD, memberships, invitations, and role-based authorization.**
 - [ ] **Phase 5: Task CRUD, assignments, priorities, statuses, deadlines, search, and filtering.**
 - [ ] **Phase 6: Task comments, activity history, and collaboration.**

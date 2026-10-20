@@ -21,6 +21,9 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
     logger.info("Starting up %s (version: %s)...", settings.PROJECT_NAME, settings.VERSION)
     logger.info("Environment: %s | Debug: %s", settings.ENVIRONMENT, settings.DEBUG)
+    if settings.ENVIRONMENT == "production":
+        # Fail startup before serving traffic if the JWT signing configuration is unsafe.
+        settings.effective_jwt_secret_key
     
     # Check database connectivity on boot
     db_status = check_db_health()
@@ -64,13 +67,12 @@ def create_application() -> FastAPI:
     # Global unhandled exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        logger.error("Unhandled exception processing request %s: %s", request.url, exc, exc_info=True)
+        logger.error("Unhandled exception processing path %s", request.url.path, exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error": "Internal Server Error",
                 "message": "An unexpected error occurred. Please try again later.",
-                "path": str(request.url.path),
             },
         )
 

@@ -15,17 +15,31 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+const TOKEN_KEY = 'taskflow.accessToken';
+
+apiClient.interceptors.request.use((config) => {
+  const token = window.localStorage.getItem(TOKEN_KEY);
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 // Response interceptor for unified error formatting
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401 && window.localStorage.getItem(TOKEN_KEY)) {
+      window.localStorage.removeItem(TOKEN_KEY);
+      window.dispatchEvent(new Event('taskflow:unauthorized'));
+    }
     const customError = {
-      message: error.response?.data?.message || error.message || 'An unexpected error occurred',
+      message: error.response?.data?.detail || error.response?.data?.message || error.message || 'An unexpected error occurred',
       status: error.response?.status,
       data: error.response?.data,
     };
     return Promise.reject(customError);
   }
 );
+
+export { TOKEN_KEY };
 
 export default apiClient;

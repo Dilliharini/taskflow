@@ -1,5 +1,5 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -67,10 +67,31 @@ class Settings(BaseSettings):
             f"{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
 
-    # Security
+    # Security & JWT Configuration
     SECRET_KEY: str = "taskflow_super_secret_development_key_change_in_production"
+    JWT_SECRET_KEY: str | None = None
+    JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    @property
+    def effective_jwt_secret_key(self) -> str:
+        """
+        Returns the active JWT signing key.
+        Fails fast if in production and a secure key is missing.
+        """
+        key = self.JWT_SECRET_KEY or self.SECRET_KEY
+        if self.ENVIRONMENT == "production":
+            if not self.JWT_SECRET_KEY or self.JWT_SECRET_KEY == "taskflow_super_secret_development_key_change_in_production":
+                raise ValueError("CRITICAL: Strong JWT_SECRET_KEY must be provided in production!")
+            if len(key) < 32:
+                raise ValueError("CRITICAL: JWT_SECRET_KEY must be at least 32 characters (256 bits) in production!")
+        if self.JWT_ALGORITHM != "HS256":
+            raise ValueError("JWT_ALGORITHM must be HS256 for this application.")
+        if len(key) < 32:
+            raise ValueError("JWT signing key must be at least 32 characters.")
+        if self.ACCESS_TOKEN_EXPIRE_MINUTES <= 0:
+            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must be positive.")
+        return key
 
 
 settings = Settings()
