@@ -17,3 +17,7 @@ class NotificationRead(NotificationBase):
     is_read: bool
     created_at: datetime
     read_at: Optional[datetime] = None
+
+
+class UnreadCountRead(BaseModel):
+    count: int = Field(..., ge=0)

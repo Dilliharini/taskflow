@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock3, MessageSquare, Pencil, Plus, RefreshCw, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useProjectUpdates } from '../realtime/useProjectUpdates';
 import {
   addMember, createComment, createTask, deleteComment, deleteProject, deleteTask,
   getActivity, getProject, listComments, listMembers, listTasks, removeMember,
@@ -54,6 +55,9 @@ export default function ProjectDetailPage() {
   }, [projectId, appliedFilters, user?.id]);
 
   useEffect(() => { refresh(); }, [refresh]);
+  const realtimeConnected = useProjectUpdates(projectId, (event) => {
+    if (['task_created', 'task_updated', 'task_deleted', 'comment_created', 'comment_deleted', 'activity_created', 'notification_created'].includes(event.type)) refresh();
+  });
   const canManage = role === 'owner' || role === 'admin';
   const canManageMembers = canManage;
   const isOwner = role === 'owner';
@@ -127,7 +131,7 @@ export default function ProjectDetailPage() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_330px]">
         <section className="min-w-0 space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-bold text-white">Tasks</h2><p className="mt-1 text-sm text-slate-400">Search and filter tasks across this project.</p></div><span className="text-sm text-slate-500">{tasks.length} shown</span></div>
+          <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-bold text-white">Tasks</h2><p className="mt-1 text-sm text-slate-400">Search and filter tasks across this project.</p></div><span className="flex items-center gap-2 text-sm text-slate-500"><span className={`h-2 w-2 rounded-full ${realtimeConnected ? 'bg-emerald-400' : 'bg-slate-600'}`} />{realtimeConnected ? 'Live' : 'Offline · refresh available'} · {tasks.length} shown</span></div>
           <form className={`${panel} grid gap-3 sm:grid-cols-2 lg:grid-cols-6`} onSubmit={(event) => { event.preventDefault(); setAppliedFilters(Object.fromEntries(Object.entries(filters).filter(([, value]) => value))); }}>
             <label className="sr-only" htmlFor="task-search">Search tasks</label><input id="task-search" className={`${field} lg:col-span-2`} placeholder="Search title or description" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
             <label className="sr-only" htmlFor="task-status">Filter status</label><select id="task-status" className={field} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}><option value="">All statuses</option><option value="todo">To do</option><option value="in_progress">In progress</option><option value="done">Done</option></select>

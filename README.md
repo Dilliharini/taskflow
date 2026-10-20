@@ -22,7 +22,7 @@ TaskFlow is a modern, high-velocity project management platform inspired by Trel
 - **Validation:** Pydantic v2 & `pydantic-settings`
 - **Database Driver:** `psycopg` (v3 with binary wheels)
 - **Migrations:** Alembic (Phase 2)
-- **Real-time:** WebSockets & Starlette (Phase 7)
+- **Real-time:** FastAPI WebSockets and in-memory project channels
 
 ### Database
 - **Engine:** PostgreSQL 16
@@ -232,6 +232,20 @@ Main Phase 4 routes require a bearer token:
 
 Task list/search query parameters include `q`, `project_id` (search), `status`, `priority`, `assignee_id`, `due_from`, `due_to`, `sort`, `order`, `limit`, and `offset` as applicable. The existing initial migration already defines the required schema, so Phase 4 adds no migration. For a fresh local database, run `alembic upgrade head` from `backend`; do not downgrade a database containing data you need. Run tests with `pytest` from `backend` and build the frontend with `npm run build` from `frontend`. Feature API tests use isolated SQLite; the live migration test requires disposable PostgreSQL.
 
+## 🔔 Notifications and live updates (Phase 5)
+
+Persistent notifications use the existing `notifications` table. Current triggers cover project membership additions, task assignment, task status changes, and comments on another user's assigned task; the actor is not notified about their own change. Notification REST endpoints are `GET /api/v1/notifications?limit=30&offset=0&unread_only=false`, `GET /api/v1/notifications/unread-count`, `PATCH /api/v1/notifications/{notification_id}/read`, and `PATCH /api/v1/notifications/read-all`. Results and updates are scoped to the authenticated user.
+
+Project updates use `ws(s)://<backend-origin>/api/v1/ws/projects/{project_id}`. Because browsers don't allow custom Authorization headers for native WebSockets, the client sends its bearer token in the first WebSocket data frame (not in the URL); the server validates it and checks active project membership before registering the socket. Events include project/task/comment/activity and notification updates. Failed WebSockets do not disable REST operations; the UI reconnects with bounded backoff and refreshes REST data when events arrive. The in-memory manager is single-process only: configure one Uvicorn worker/instance, or add a shared pub/sub broker before scaling horizontally. Do not enable WebSocket compression or log access tokens. Production must use HTTPS/WSS and a proxy/host that supports WebSocket upgrades and suitable idle timeouts.
+
+### Deployment preparation (not deployed)
+
+- Host the Vite static output (`frontend/dist`) on a static host/CDN with SPA history fallback; configure `VITE_API_BASE_URL` to the HTTPS backend origin and `VITE_WS_BASE_URL` to that same origin (or leave both blank when frontend/backend share an origin and the reverse proxy routes `/api`). WebSocket URL selection automatically uses `wss:` for HTTPS pages.
+- Run FastAPI on a host that supports long-lived WebSocket upgrades and configure the proxy/load balancer for HTTP/1.1 Upgrade/Connection headers, suitable idle timeouts, and sticky routing if there are multiple workers (though shared event delivery remains unavailable across workers).
+- Use managed PostgreSQL with network allow-lists/private networking and TLS. Configure `DATABASE_URL`, `JWT_SECRET_KEY`, and exact comma-separated/JSON `BACKEND_CORS_ORIGINS` as host secrets/environment variables. Never use `.env.example` values as production credentials.
+- Run `alembic upgrade head` as a one-off release step against a backup/verified database; the current Phase 5 features do not change the schema. Do not use downgrade as a deployment rollback strategy when it could drop user data.
+- Deployment is only prepared in this repository; hosting account access, DNS, provider settings, secrets, and production verification remain manual.
+
 ## 📡 API Endpoints
 
 | Method | Path | Description | Query Parameters |
@@ -250,6 +264,11 @@ Task list/search query parameters include `q`, `project_id` (search), `status`, 
 | `GET` / `PATCH` / `DELETE` | `/api/v1/projects/{project_id}` | Read/update/delete an authorized project | Bearer token |
 | `GET` / `POST` | `/api/v1/projects/{project_id}/tasks` | List/filter or create project tasks | Bearer token |
 | `GET` | `/api/v1/projects/dashboard` | Access-scoped dashboard counts and task lists | Bearer token |
+| `GET` | `/api/v1/notifications` | Current user's notifications | Bearer token |
+| `GET` | `/api/v1/notifications/unread-count` | Current user's unread count | Bearer token |
+| `PATCH` | `/api/v1/notifications/{notification_id}/read` | Mark own notification read | Bearer token |
+| `PATCH` | `/api/v1/notifications/read-all` | Mark own notifications read | Bearer token |
+| `WebSocket` | `/api/v1/ws/projects/{project_id}` | Membership-authorized project events | Initial auth frame |
 
 ---
 
@@ -259,6 +278,8 @@ Task list/search query parameters include `q`, `project_id` (search), `status`, 
 - [x] **Phase 2: Database models, SQLAlchemy configuration, Alembic migrations, and database integration tests.**
 - [x] **Phase 3: Registration, login, logout, authentication, protected routes, and security tests.**
 - [x] **Phase 4: Project CRUD, memberships, invitations, and role-based authorization.**
+- [x] **Phase 5: Notifications, real-time project events, testing, and deployment preparation.**
+- [ ] **Phase 6: External deployment, multi-instance event broker, and production monitoring.**
 - [ ] **Phase 5: Task CRUD, assignments, priorities, statuses, deadlines, search, and filtering.**
 - [ ] **Phase 6: Task comments, activity history, and collaboration.**
 - [ ] **Phase 7: Notifications and real-time WebSocket updates.**

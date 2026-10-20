@@ -21,3 +21,8 @@ export const createComment = (projectId, taskId, payload) => data(apiClient.post
 export const updateComment = (projectId, taskId, commentId, payload) => data(apiClient.patch(`${root}/${projectId}/tasks/${taskId}/comments/${commentId}`, payload));
 export const deleteComment = (projectId, taskId, commentId) => apiClient.delete(`${root}/${projectId}/tasks/${taskId}/comments/${commentId}`);
 export const getActivity = (id) => data(apiClient.get(`${root}/${id}/activity`));
+
+export const listNotifications = (params = {}) => data(apiClient.get('/api/v1/notifications', { params }));
+export const getUnreadCount = () => data(apiClient.get('/api/v1/notifications/unread-count'));
+export const markNotificationRead = (id) => data(apiClient.patch(`/api/v1/notifications/${id}/read`));
+export const markAllNotificationsRead = () => data(apiClient.patch('/api/v1/notifications/read-all'));

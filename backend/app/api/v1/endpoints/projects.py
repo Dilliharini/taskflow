@@ -6,8 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user
 from app.core.database import get_db
+from app.core.realtime import publish_project_event, publish_user_event
 from app.models import (
-    ActivityLog, Comment, Project, ProjectMember, ProjectRole, Task, TaskPriority,
+    ActivityLog, Comment, Notification, Project, ProjectMember, ProjectRole, Task, TaskPriority,
     TaskStatus, User,
 )
 from app.schemas.activity import ActivityDetail
@@ -32,6 +33,10 @@ def record_activity(
         project_id=project_id, actor_id=actor_id, action=action,
         entity_type=entity_type, entity_id=entity_id, details=details,
     ))
+
+
+def add_notification(db: Session, user_id: uuid.UUID, event_type: str, message: str) -> None:
+    db.add(Notification(user_id=user_id, type=event_type, message=message))
 
 
 @router.get("/dashboard", response_model=DashboardRead)
@@ -123,6 +128,7 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db), user: 
     record_activity(db, project.id, user.id, "created", "project", project.id, {"name": project.name})
     db.commit()
     db.refresh(project)
+    publish_project_event(project.id, "activity_created", {"actor_id": str(user.id), "action": "created", "entity_type": "project", "entity_id": str(project.id), "name": project.name})
     return {**ProjectRead.model_validate(project).model_dump(), "creator_name": user.name}
 
 
@@ -142,6 +148,7 @@ def update_project(project_id: uuid.UUID, payload: ProjectUpdate, db: Session = 
     record_activity(db, project.id, user.id, "updated", "project", project.id, {"fields": list(changes)})
     db.commit()
     db.refresh(project)
+    publish_project_event(project.id, "activity_created", {"actor_id": str(user.id), "action": "updated", "entity_type": "project", "entity_id": str(project.id), "fields": list(changes)})
     return {**ProjectRead.model_validate(project).model_dump(), "creator_name": project.owner.name}
 
 
@@ -168,7 +175,7 @@ def list_members(project_id: uuid.UUID, db: Session = Depends(get_db), user: Use
 
 @router.post("/{project_id}/members", response_model=ProjectMemberDetail, status_code=status.HTTP_201_CREATED)
 def add_member(project_id: uuid.UUID, payload: ProjectMemberCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
-    _, role = get_project_access(db, project_id, user)
+    project, role = get_project_access(db, project_id, user)
     require_role(role, ProjectRole.OWNER, ProjectRole.ADMIN)
     if payload.role == ProjectRole.OWNER or (payload.role == ProjectRole.ADMIN and role != ProjectRole.OWNER.value):
         raise HTTPException(status_code=403, detail="Only an owner can grant the admin role.")
@@ -182,9 +189,14 @@ def add_member(project_id: uuid.UUID, payload: ProjectMemberCreate, db: Session 
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="That user is already a project member.") from None
+    if target.id != user.id:
+        add_notification(db, target.id, "project_added", f"You were added to project '{project.name}'.")
     record_activity(db, project_id, user.id, "member_added", "project_member", member.id, {"email": target.email, "role": member.role})
     db.commit()
     db.refresh(member)
+    publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "member_added", "entity_type": "project_member", "entity_id": str(member.id), "user_id": str(target.id), "role": member.role})
+    if target.id != user.id:
+        publish_user_event(target.id, "notification_created", project_id, {"type": "project_added", "message": f"You were added to project '{project.name}'."})
     return {"id": member.id, "user_id": target.id, "name": target.name, "email": target.email, "role": member.role, "joined_at": member.joined_at}
 
 
@@ -203,6 +215,7 @@ def remove_member(project_id: uuid.UUID, member_user_id: uuid.UUID, db: Session 
     record_activity(db, project_id, user.id, "member_removed", "project_member", member.id, details)
     db.delete(member)
     db.commit()
+    publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "member_removed", "entity_type": "project_member", "entity_id": str(member.id)})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -248,8 +261,14 @@ def create_task(project_id: uuid.UUID, payload: TaskCreate, db: Session = Depend
     db.add(task)
     db.flush()
     record_activity(db, project_id, user.id, "created", "task", task.id, {"title": task.title})
+    if task.assignee_id and task.assignee_id != user.id:
+        add_notification(db, task.assignee_id, "task_assigned", f"You were assigned to task '{task.title}'.")
     db.commit()
     db.refresh(task)
+    publish_project_event(project_id, "task_created", {"id": str(task.id), "title": task.title, "status": task.status, "priority": task.priority, "assignee_id": str(task.assignee_id) if task.assignee_id else None})
+    publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "created", "entity_type": "task", "entity_id": str(task.id), "title": task.title})
+    if task.assignee_id and task.assignee_id != user.id:
+        publish_user_event(task.assignee_id, "notification_created", project_id, {"type": "task_assigned", "message": f"You were assigned to task '{task.title}'."})
     return task
 
 
@@ -267,6 +286,8 @@ def update_task(project_id: uuid.UUID, task_id: uuid.UUID, payload: TaskUpdate, 
     if "assignee_id" in changes:
         ensure_project_member(db, project_id, changes["assignee_id"])
     old_values = {key: getattr(task, key) for key in changes}
+    old_assignee_id = task.assignee_id
+    old_status = task.status
     for field, value in changes.items():
         if hasattr(value, "value"):
             value = value.value
@@ -276,8 +297,22 @@ def update_task(project_id: uuid.UUID, task_id: uuid.UUID, payload: TaskUpdate, 
             "fields": list(changes),
             "changes": {key: {"from": str(old_values[key]), "to": str(getattr(task, key))} for key in changes if key in {"status", "priority", "assignee_id"}},
         })
+    if "assignee_id" in changes and task.assignee_id and task.assignee_id != old_assignee_id and task.assignee_id != user.id:
+        add_notification(db, task.assignee_id, "task_assigned", f"You were assigned to task '{task.title}'.")
+    if "status" in changes and task.status != old_status and task.assignee_id and task.assignee_id != user.id:
+        add_notification(db, task.assignee_id, "task_status_changed", f"Task '{task.title}' status changed to {task.status}.")
     db.commit()
     db.refresh(task)
+    if changes:
+        event_type = "task_updated"
+        publish_project_event(project_id, event_type, {"id": str(task.id), "title": task.title, "status": task.status, "priority": task.priority, "assignee_id": str(task.assignee_id) if task.assignee_id else None, "fields": list(changes)})
+        publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "updated", "entity_type": "task", "entity_id": str(task.id), "title": task.title})
+    for notify_id, event_type, message in (
+        (task.assignee_id if "assignee_id" in changes else None, "task_assigned", f"You were assigned to task '{task.title}'."),
+        (task.assignee_id if "status" in changes and task.status != old_status else None, "task_status_changed", f"Task '{task.title}' status changed to {task.status}."),
+    ):
+        if notify_id and notify_id != user.id and ((event_type == "task_assigned" and notify_id != old_assignee_id) or event_type == "task_status_changed"):
+            publish_user_event(notify_id, "notification_created", project_id, {"type": event_type, "message": message})
     return task
 
 
@@ -286,9 +321,13 @@ def delete_task(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = Depends
     _, role = get_project_access(db, project_id, user)
     require_role(role, ProjectRole.OWNER, ProjectRole.ADMIN)
     task = get_project_task(db, project_id, task_id)
+    task_title = task.title
+    task_uuid = task.id
     record_activity(db, project_id, user.id, "deleted", "task", task.id, {"title": task.title})
     db.delete(task)
     db.commit()
+    publish_project_event(project_id, "task_deleted", {"id": str(task_uuid)})
+    publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "deleted", "entity_type": "task", "entity_id": str(task_uuid), "title": task_title})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -305,13 +344,19 @@ def list_comments(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = Depen
 @router.post("/{project_id}/tasks/{task_id}/comments", response_model=CommentDetail, status_code=status.HTTP_201_CREATED)
 def create_comment(project_id: uuid.UUID, task_id: uuid.UUID, payload: CommentCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
     get_project_access(db, project_id, user)
-    get_project_task(db, project_id, task_id)
+    task = get_project_task(db, project_id, task_id)
     comment = Comment(task_id=task_id, author_id=user.id, content=payload.content)
     db.add(comment)
     db.flush()
     record_activity(db, project_id, user.id, "commented", "comment", comment.id, {"task_id": str(task_id)})
+    if task.assignee_id and task.assignee_id != user.id:
+        add_notification(db, task.assignee_id, "task_comment", f"{user.name} commented on task '{task.title}'.")
     db.commit()
     db.refresh(comment)
+    publish_project_event(project_id, "comment_created", {"id": str(comment.id), "task_id": str(task_id), "author_id": str(user.id), "author_name": user.name, "content": comment.content})
+    publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "commented", "entity_type": "comment", "entity_id": str(comment.id), "task_id": str(task_id)})
+    if task.assignee_id and task.assignee_id != user.id:
+        publish_user_event(task.assignee_id, "notification_created", project_id, {"type": "task_comment", "message": f"{user.name} commented on task '{task.title}'."})
     return {"id": comment.id, "task_id": comment.task_id, "author_id": user.id,
             "author_name": user.name, "content": comment.content,
             "created_at": comment.created_at, "updated_at": comment.updated_at}
@@ -331,6 +376,8 @@ def update_comment(project_id: uuid.UUID, task_id: uuid.UUID, comment_id: uuid.U
     record_activity(db, project_id, user.id, "comment_updated", "comment", comment.id, {"task_id": str(task_id)})
     db.commit()
     db.refresh(comment)
+    publish_project_event(project_id, "comment_created", {"id": str(comment.id), "task_id": str(task_id), "author_id": str(comment.author_id), "content": comment.content, "updated": True})
+    publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "comment_updated", "entity_type": "comment", "entity_id": str(comment.id), "task_id": str(task_id)})
     return {"id": comment.id, "task_id": task_id, "author_id": comment.author_id,
             "author_name": db.get(User, comment.author_id).name, "content": comment.content,
             "created_at": comment.created_at, "updated_at": comment.updated_at}
@@ -345,9 +392,12 @@ def delete_comment(project_id: uuid.UUID, task_id: uuid.UUID, comment_id: uuid.U
         raise HTTPException(status_code=404, detail="Comment not found.")
     if comment.author_id != user.id and role not in (ProjectRole.OWNER.value, ProjectRole.ADMIN.value):
         raise HTTPException(status_code=403, detail="Only the author or a project admin can delete this comment.")
+    comment_uuid = comment.id
     record_activity(db, project_id, user.id, "comment_deleted", "comment", comment.id, {"task_id": str(task_id)})
     db.delete(comment)
     db.commit()
+    publish_project_event(project_id, "comment_deleted", {"id": str(comment_uuid), "task_id": str(task_id)})
+    publish_project_event(project_id, "activity_created", {"actor_id": str(user.id), "action": "comment_deleted", "entity_type": "comment", "entity_id": str(comment_uuid), "task_id": str(task_id)})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
