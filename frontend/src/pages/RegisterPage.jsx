@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { registerUser } from '../api/auth';
 
-const inputClass = 'w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20';
+const inputClass = 'focus-ring w-full rounded-xl border border-slate-700 bg-white px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-indigo-400';
 
 export default function RegisterPage() {
   const { user } = useAuth();
@@ -30,10 +30,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[75vh] max-w-md items-center px-4 py-12">
-      <section className="w-full rounded-3xl border border-slate-700/70 bg-slate-800/60 p-8 shadow-2xl">
-        <p className="text-sm font-semibold uppercase tracking-widest text-indigo-400">Get started</p>
-        <h1 className="mt-2 text-3xl font-bold text-white">Create your account</h1>
+    <main className="mx-auto flex min-h-[calc(100vh-11rem)] max-w-md items-center px-4 py-12">
+      <section className="surface-shadow w-full rounded-3xl border border-slate-700 bg-white p-7 sm:p-9">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-400">Get started</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">Create your account</h1>
         <p className="mt-2 text-sm text-slate-400">Set up your TaskFlow identity to continue.</p>
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
           <label className="block space-y-2 text-sm font-medium text-slate-200">Name
@@ -46,8 +46,8 @@ export default function RegisterPage() {
             <input className={inputClass} type="password" autoComplete="new-password" required minLength={8} maxLength={128} value={password} onChange={(e) => setPassword(e.target.value)} />
             <span className="block text-xs font-normal text-slate-500">Use at least 8 characters.</span>
           </label>
-          {error && <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert">{error}</p>}
-          <button className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-60" disabled={busy}>
+          {error && <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700" role="alert">{error}</p>}
+          <button className="focus-ring w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-on-accent transition hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-60" disabled={busy}>
             {busy ? 'Creating account…' : 'Create account'}
           </button>
         </form>

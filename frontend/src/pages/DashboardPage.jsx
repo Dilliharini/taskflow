@@ -4,8 +4,8 @@ import { ArrowRight, CalendarClock, FolderKanban, ListTodo, Plus, RefreshCw } fr
 import { createProject, getDashboard, listProjects } from '../api/projects';
 import { useAuth } from '../auth/AuthContext';
 
-const panel = 'rounded-2xl border border-slate-700/70 bg-slate-800/55 p-5';
-const button = 'inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-60';
+const panel = 'rounded-2xl border border-slate-700 bg-white p-5 surface-shadow';
+const button = 'focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-on-accent transition hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-60';
 const statusLabels = { todo: 'To do', in_progress: 'In progress', done: 'Done' };
 
 export default function DashboardPage() {
@@ -55,11 +55,11 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-400">Your workspace</p>
-          <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Good to see you, {user?.name}</h1>
-          <p className="mt-2 text-slate-400">A clear view of the projects and work moving forward.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-400">Your workspace</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">Good to see you, {user?.name}</h1>
+          <p className="mt-2 text-sm text-slate-400 sm:text-base">A clear view of the projects and work moving forward.</p>
         </div>
-        <button type="button" className="inline-flex items-center gap-2 self-start rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 sm:self-auto" onClick={refresh} disabled={loading}>
+        <button type="button" className="focus-ring inline-flex items-center gap-2 self-start rounded-xl border border-slate-700 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-900 sm:self-auto" onClick={refresh} disabled={loading}>
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
       </section>
@@ -75,7 +75,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-[1.45fr_0.85fr]">
         <section className="space-y-4" aria-labelledby="projects-title">
           <div className="flex items-center justify-between">
-            <div><h2 id="projects-title" className="text-xl font-bold text-white">Projects</h2><p className="mt-1 text-sm text-slate-400">Workspaces you own or collaborate on.</p></div>
+            <div><h2 id="projects-title" className="text-xl font-bold tracking-tight text-white">Projects</h2><p className="mt-1 text-sm text-slate-400">Workspaces you own or collaborate on.</p></div>
             <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">{projects.length} total</span>
           </div>
 
@@ -111,7 +111,7 @@ export default function DashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-xl font-bold text-white">Recently updated</h2>
-        {dashboard?.recently_updated?.length ? <div className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-800/50 divide-y divide-slate-700/60">
+        {dashboard?.recently_updated?.length ?         <div className="surface-shadow overflow-hidden rounded-2xl border border-slate-700 bg-white divide-y divide-slate-700/60">
           {dashboard.recently_updated.slice(0, 6).map((task) => <Link key={task.id} to={`/projects/${task.project_id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition hover:bg-slate-800"><div><p className="font-medium text-slate-100">{task.title}</p><p className="mt-1 text-xs text-slate-500">{statusLabels[task.status]} · {task.priority} priority</p></div><time className="text-xs text-slate-500" dateTime={task.updated_at}>{new Date(task.updated_at).toLocaleString()}</time></Link>)}
         </div> : <p className={`${panel} text-sm text-slate-400`}>Your recent task updates will show here.</p>}
       </section>

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import StatusBadge from './StatusBadge';
-import { Bell, CheckCheck, Layers, Kanban } from 'lucide-react';
+import { Bell, CheckCheck, Layers, LogOut, LayoutDashboard, FolderKanban } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { getUnreadCount, listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/projects';
@@ -74,50 +73,125 @@ export default function Navbar() {
       setNotificationError(error.message || 'Could not update notifications.');
     }
   }
-  return (
-    <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-            <Layers className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg text-white tracking-tight">TaskFlow</span>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full">
-                Phase 4
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-medium">Collaborative Project Management</p>
-          </div>
-        </div>
 
-        {/* Center Navigation Links (Preview for future phases) */}
-        <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-slate-400">
-          {user && <Link to="/" className="flex items-center gap-1.5 px-3 py-1.5 text-white bg-slate-800/80 rounded-lg">
-            <Kanban className="w-4 h-4 text-indigo-400" /> Dashboard
-          </Link>}
-          {user && <span className="px-3 py-1.5 text-slate-300">{user.name}</span>}
-        </nav>
-
-        {/* Right Status Badge */}
-        <div className="flex items-center gap-3">
-          <StatusBadge />
-          {user && <div className="relative">
-            <button type="button" onClick={toggleNotifications} aria-label={`Notifications, ${unread} unread`} aria-expanded={open} className="relative rounded-lg border border-slate-700 p-2 text-slate-300 transition hover:bg-slate-800 hover:text-white">
-              <Bell size={18} />
-              {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white">{unread > 99 ? '99+' : unread}</span>}
-            </button>
-            {open && <section className="absolute right-0 top-12 z-[60] w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl" aria-label="Notifications">
-              <header className="flex items-center justify-between border-b border-slate-700 px-4 py-3"><div><h2 className="text-sm font-semibold text-white">Notifications</h2><p className="text-xs text-slate-500">{unread} unread</p></div><button type="button" onClick={markAllRead} disabled={!unread} className="inline-flex items-center gap-1 text-xs text-indigo-300 hover:text-indigo-200 disabled:opacity-40"><CheckCheck size={14} /> Mark all read</button></header>
-              {notificationError && <p className="px-4 py-3 text-xs text-rose-300" role="alert">{notificationError}</p>}
-              {loadingNotifications ? <p className="px-4 py-6 text-center text-sm text-slate-400" role="status">Loading notifications…</p> : notifications.length === 0 ? <p className="px-4 py-8 text-center text-sm text-slate-400">You're all caught up.</p> : <ul className="max-h-96 divide-y divide-slate-800 overflow-y-auto">{notifications.map((item) => <li key={item.id} className={`flex items-start gap-3 px-4 py-3 ${item.is_read ? '' : 'bg-indigo-500/[0.06]'}`}><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.is_read ? 'bg-slate-700' : 'bg-indigo-400'}`} /><div className="min-w-0 flex-1"><p className="text-sm text-slate-200">{item.message}</p><time className="mt-1 block text-[11px] text-slate-500" dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></div>{!item.is_read && <button type="button" aria-label="Mark notification as read" onClick={() => markRead(item.id)} className="text-xs text-indigo-300 hover:text-white">Read</button>}</li>)}</ul>}
-            </section>}
-          </div>}
-          {user ? <button type="button" onClick={handleLogout} className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800">Sign out</button> : <Link to="/login" className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800">Sign in</Link>}
-        </div>
+  function notificationControl() {
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={toggleNotifications}
+          aria-label={`Notifications, ${unread} unread`}
+          aria-expanded={open}
+          className="focus-ring relative rounded-xl border border-slate-700 bg-white p-2.5 text-slate-300 transition hover:bg-slate-900"
+        >
+          <Bell size={18} />
+          {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-on-accent">{unread > 99 ? '99+' : unread}</span>}
+        </button>
+        {open && (
+          <section className="surface-shadow absolute right-0 top-12 z-[60] w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-700 bg-white" aria-label="Notifications">
+            <header className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+              <div><h2 className="text-sm font-semibold text-slate-100">Notifications</h2><p className="text-xs text-slate-500">{unread} unread</p></div>
+              <button type="button" onClick={markAllRead} disabled={!unread} className="inline-flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-600 disabled:opacity-40"><CheckCheck size={14} /> Mark all read</button>
+            </header>
+            {notificationError && <p className="px-4 py-3 text-xs text-rose-600" role="alert">{notificationError}</p>}
+            {loadingNotifications ? <p className="px-4 py-6 text-center text-sm text-slate-400" role="status">Loading notifications…</p> : notifications.length === 0 ? <p className="px-4 py-8 text-center text-sm text-slate-400">You're all caught up.</p> : (
+              <ul className="max-h-96 divide-y divide-slate-700 overflow-y-auto">
+                {notifications.map((item) => (
+                  <li key={item.id} className={`flex items-start gap-3 px-4 py-3 ${item.is_read ? '' : 'bg-indigo-500/[0.06]'}`}>
+                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.is_read ? 'bg-slate-600' : 'bg-indigo-500'}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-200">{item.message}</p>
+                      <time className="mt-1 block text-[11px] text-slate-500" dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
+                    </div>
+                    {!item.is_read && <button type="button" aria-label="Mark notification as read" onClick={() => markRead(item.id)} className="text-xs font-medium text-indigo-400 hover:text-indigo-600">Read</button>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
-    </header>
+    );
+  }
+
+  if (!user) {
+    return (
+      <header className="sticky top-0 z-40 border-b border-slate-700 bg-white/95 backdrop-blur lg:bg-white">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Brand />
+          <nav className="flex items-center gap-2">
+            <Link to="/login" className="focus-ring rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900">Sign in</Link>
+            <Link to="/register" className="focus-ring rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-on-accent transition hover:bg-indigo-500">Get started</Link>
+          </nav>
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    <>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] flex-col border-r border-slate-700 bg-white px-4 py-6 lg:flex">
+        <Brand />
+        <p className="mb-3 mt-10 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Workspace</p>
+        <nav className="space-y-1" aria-label="Main navigation">
+          <Link to="/" className="flex items-center gap-3 rounded-xl bg-indigo-500/10 px-3 py-2.5 text-sm font-semibold text-indigo-400">
+            <LayoutDashboard size={17} /> Overview
+          </Link>
+          <Link to="/#projects-title" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-900">
+            <FolderKanban size={17} /> Projects
+          </Link>
+        </nav>
+        <div className="mt-auto space-y-4">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-900/70 p-3">
+            <Avatar name={user.name} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-100">{user.name}</p>
+              <p className="truncate text-xs text-slate-500">{user.email}</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-1">
+            {notificationControl()}
+            <button type="button" onClick={handleLogout} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900" title="Sign out">
+              <LogOut size={16} /> Sign out
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <header className="sticky top-0 z-40 border-b border-slate-700 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <Brand />
+          <div className="flex items-center gap-2">
+            {notificationControl()}
+            <button type="button" onClick={handleLogout} className="rounded-xl border border-slate-700 p-2.5 text-slate-300 hover:bg-slate-900" aria-label="Sign out" title="Sign out">
+              <LogOut size={17} />
+            </button>
+          </div>
+        </div>
+        <nav className="mt-3 flex gap-2 border-t border-slate-700 pt-3" aria-label="Main navigation">
+          <Link to="/" className="flex items-center gap-2 rounded-lg bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-400"><LayoutDashboard size={15} /> Overview</Link>
+          <Link to="/#projects-title" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-900"><FolderKanban size={15} /> Projects</Link>
+        </nav>
+      </header>
+    </>
   );
+}
+
+function Brand() {
+  return (
+    <Link to="/" className="flex min-w-0 items-center gap-3 rounded-lg">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-on-accent">
+        <Layers size={21} strokeWidth={2.2} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-base font-bold tracking-tight text-slate-100">TaskFlow</span>
+        <span className="block truncate text-[11px] font-medium text-slate-500">Work, in good flow.</span>
+      </span>
+    </Link>
+  );
+}
+
+function Avatar({ name }) {
+  const initials = name?.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'T';
+  return <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-indigo-600">{initials}</span>;
 }
